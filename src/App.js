@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { getAccount, getTrades, getPositions, getMarketData, getMarketStatus, getQuote, executeTrade } from './api';
-import { TrendingUp, TrendingDown, DollarSign, Activity, RefreshCw, AlertCircle } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { RefreshCw } from 'lucide-react';
+import Login from './Login';
 import './App.css';
 
 // ============================================
@@ -250,6 +250,8 @@ const TradeForm = ({ onTradeExecuted }) => {
 // ============================================
 
 export default function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
   const [account, setAccount] = useState(null);
   const [trades, setTrades] = useState([]);
   const [positions, setPositions] = useState([]);
@@ -279,13 +281,48 @@ export default function App() {
     setLoading(false);
   }, []);
 
+  // Check auth on load
   useEffect(() => {
+    getAccount()
+      .then(() => {
+        setIsAuthenticated(true);
+        setAuthChecked(true);
+      })
+      .catch(() => {
+        setIsAuthenticated(false);
+        setAuthChecked(true);
+        setLoading(false);
+      });
+  }, []);
+
+  // Fetch data when authenticated
+  useEffect(() => {
+    if (!isAuthenticated) return;
     fetchAll();
-    // Auto-refresh every 30 seconds
     const interval = setInterval(fetchAll, 30000);
     return () => clearInterval(interval);
-  }, [fetchAll]);
+  }, [fetchAll, isAuthenticated]);
 
+  // Auth checking
+  if (!authChecked) {
+    return (
+      <div style={{ backgroundColor: '#030712', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34d399', fontFamily: 'monospace' }}>
+        Loading...
+      </div>
+    );
+  }
+
+  // Show login if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <Login onLogin={() => {
+        setIsAuthenticated(true);
+        fetchAll();
+      }} />
+    );
+  }
+
+  // Loading dashboard data
   if (loading) {
     return (
       <div style={{ backgroundColor: '#030712', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34d399', fontFamily: 'monospace' }}>
@@ -314,6 +351,15 @@ export default function App() {
             style={{ background: 'none', border: '1px solid #374151', borderRadius: '6px', color: '#6b7280', padding: '6px 10px', cursor: 'pointer' }}
           >
             <RefreshCw size={14} />
+          </button>
+          <button
+            onClick={() => {
+              fetch('/api-auth/logout/', { method: 'POST', credentials: 'include', headers: { 'X-CSRFToken': document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '' } })
+                .then(() => setIsAuthenticated(false));
+            }}
+            style={{ background: 'none', border: '1px solid #374151', borderRadius: '6px', color: '#6b7280', padding: '6px 12px', cursor: 'pointer', fontSize: '12px' }}
+          >
+            Sign Out
           </button>
         </div>
       </div>
